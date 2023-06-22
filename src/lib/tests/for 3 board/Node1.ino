@@ -1,4 +1,4 @@
-// slave
+// slave with addr = 2
 
 #define DEBUG_
 
@@ -7,7 +7,7 @@
 #include <SoftwareSerial.h>
 SoftwareSerial mySerial(10, 11);  // RX, TX
 
-SerialBus bus(&mySerial, 2);
+SerialBus bus(&mySerial, 2, 50);
 
 void setup() {
   Serial.begin(9600);
@@ -19,47 +19,31 @@ bool flag = false;
 void loop() {
   if (!flag) {
 
-    test0();
+    test0();  // check crc
 
-    test1();
-    Serial.println("Test 1 complete");
+    getData();  // data from test 1 or 2
 
-    test2();
-    Serial.println("Test 2 complete");
+    getData();  // data from test 3 (broadcast)
 
-    test3();
-    Serial.println("Test 3 complete");
-    
+    getData();  // data from test 4
+
+    Serial.println("Delay before test 5");
+    delay(5000);
+    Serial.println("Delay be over test 5");
+    getData();  // data from test 5
+    getData();  // data from test 5
+
     flag = true;
   }
 }
 
-void test0(){
-    char bf[10] = { 3, 12, 13, 0, 5, 1, 2, 3, 4, 5 };
-    Serial.print("CRC = ");
-    Serial.println(bus.crc8(bf, 10));
+void test0() {
+  char bf[10] = { 3, 12, 13, 0, 5, 1, 2, 3, 4, 5 };
+  Serial.print("CRC = ");
+  Serial.println(bus.crc8(bf, 10));
 }
 
-void test1() {
-  while (!bus.available()) {
-    delay(1);
-  }
-
-  bus.getData()[bus.getSizeData()] = '\0';
-  Serial.println(String((const char *)bus.getData()));
-}
-
-void test2() {
-  while (!bus.available()) {
-    delay(1);
-  }
-
-  bus.getData()[bus.getSizeData()] = '\0';
-  Serial.println(String((const char *)bus.getData()));
-}
-
-void test3() {
-  bus.changeAddress(3);
+void getData() {
 
   while (!bus.available()) {
     delay(1);
