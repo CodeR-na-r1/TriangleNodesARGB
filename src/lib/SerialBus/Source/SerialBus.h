@@ -10,7 +10,8 @@
 #define SERIAL_BUS
 
 #define START_SYMBOL 3
-#define WAITING_DATA_TIMEOUT 15
+#define WAITING_DATA_TIMEOUT 50
+#define WAITING_SEND_COMMIT 3000
 
 #define BROADCAST_ADDR 0
 
@@ -50,7 +51,7 @@ public:
     return MIN_PACKET_SIZE_;
   }
 
-  void send(uint8_t address, char* data, uint16_t size, bool needCommiting = false);
+  bool send(uint8_t address, char* data, uint16_t size, bool needCommiting = false);
   void sendBroadcast(char* data, uint16_t size);
   char* getData() {
     isData_ = false;
@@ -65,6 +66,8 @@ public:
 
   static int8_t crc8(char* buffer, uint16_t size);
   bool parsePacket();
+  void sendCommit();
+  bool waitCommit();
   void debugOutput(const char* message, bool newLine = true);
 };
 
@@ -119,7 +122,7 @@ uint8_t SerialBus::getTXaddress() const {
   return addrFrom_;
 }
 
-void SerialBus::send(uint8_t addressTo, char* data, uint16_t size, bool needCommiting) {
+bool SerialBus::send(uint8_t addressTo, char* data, uint16_t size, bool needCommiting) {
   stream_->write(START_SYMBOL);
 
   stream_->write(addressTo);
@@ -133,10 +136,18 @@ void SerialBus::send(uint8_t addressTo, char* data, uint16_t size, bool needComm
   }
 
   stream_->write(crc8(data, size));
-  Serial.print("CRC = ");
-  Serial.println(crc8(data, size));
+  debugOutput("CRC = ");
+  debugOutput(String(crc8(data, size)).c_str(), true);
 
-  Serial
+  int8_t isCommitInt8 = (needCommiting ? 1 : 0);
+  stream_->write(isCommitInt8);
+
+  if (needCommiting) {
+
+    return waitCommit();
+  }
+
+  return true;
 }
 
 void SerialBus::sendBroadcast(char* data, uint16_t size) {
@@ -169,9 +180,9 @@ bool SerialBus::parsePacket() {
   sizeData_ = stream_->read();
   sizeData_ = (sizeData_ << 8) | stream_->read();
 
-  if (stream_->available() < sizeData_ + sizeof(int8_t)) {  // sizeData_ + crcSize
+  if (stream_->available() < sizeData_ + sizeof(int8_t) + sizeof(int8_t)) {  // sizeData_ + crcSize + iscommit byte
     delay(WAITING_DATA_TIMEOUT);
-    if (stream_->available() < sizeData_ + sizeof(int8_t)) {
+    if (stream_->available() < sizeData_ + sizeof(int8_t) + sizeof(int8_t)) {
       debugOutput("sizeData_ ERROR!", true);
       return false;
     }
@@ -182,14 +193,92 @@ bool SerialBus::parsePacket() {
   int8_t crc = stream_->read();
   if (crc != crc8(buffer_, sizeData_)) {
     debugOutput("CRC ERROR! (crc -> ");
-    debugOutput(crc);
+    debugOutput(String(crc, DEC).c_str());
     debugOutput(" != ");
-    debugOutput(crc8(buffer_, sizeData_));
+    debugOutput(String(crc8(buffer_, sizeData_)).c_str());
     debugOutput(")", true);
     return false;
   }
 
+  int8_t isCommit = stream_->read();
+
+  if (isCommit == 1) {
+    sendCommit();
+    debugOutput("commit is send");
+  }
+
   return true;
+}
+
+void SerialBus::sendCommit() {
+  stream_->write(START_SYMBOL);
+
+  stream_->write(addrFrom_);
+  stream_->write(address_);
+
+  stream_->write(uint8_t(0));  // :)  Compilation error: call of overloaded 'write(int)' is ambiguous
+  stream_->write(1);
+
+  stream_->write(1);  // any data with size == 1)
+
+  stream_->write(48);  // crc for data
+
+  stream_->write(uint8_t(0));  // commit byte == false (0)
+}
+
+bool SerialBus::waitCommit() {
+  // save state
+
+  bool isState = isData_;
+
+  uint8_t addrToCopy = addrTo_;
+  uint8_t addrFromCopy = addrFrom_;
+  uint16_t sizeDataCopy = sizeData_;
+  char* bufferCopy = nullptr;
+
+  if (isState) {
+    debugOutput("save state (waitCommit)");
+    bufferCopy = new char[sizeData_];
+    for (int i = 0; i < sizeDataCopy; ++i)
+      bufferCopy[i] = buffer_[i];
+  }
+
+  isData_ = false;
+  bool isError = false;
+  auto timer = millis();
+
+  while (!this->available()) {
+    delay(1);
+    if (millis() - timer > WAITING_SEND_COMMIT) {
+      isError = true;
+      break;
+    }
+  }
+
+  uint16_t sizeDataResponse = sizeData_;
+
+  // restore state
+
+  isData_ = isState;
+    
+  if (isState) {
+    debugOutput("restore state (waitCommit)");
+    addrTo_ = addrToCopy;
+    addrFrom_ = addrFromCopy;
+    sizeData_ = sizeDataCopy;
+    for (int i = 0; i < sizeDataCopy; ++i)
+      buffer_[i] = bufferCopy[i];
+
+    delete[] bufferCopy;
+  }
+
+  if (isError == false && sizeDataResponse == 1) {
+    debugOutput("commit ~successful~ (waitCommit)");
+    return true;
+  }
+
+  debugOutput("commit ERROR! (waitCommit)");
+  return false;
 }
 
 int8_t SerialBus::crc8(char* buffer, uint16_t size) {
