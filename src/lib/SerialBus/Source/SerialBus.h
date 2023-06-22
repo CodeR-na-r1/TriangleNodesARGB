@@ -1,3 +1,11 @@
+/*
+
+  Структура пакета:
+  TODO  
+
+*/
+
+
 #ifndef SERIAL_BUS
 #define SERIAL_BUS
 
@@ -24,7 +32,7 @@ private:
   uint8_t maxRetries_ = 3;
 
   uint16_t errorCounter_ = 0;
-  static constexpr uint8_t MIN_PACKET_SIZE_ = 1 + sizeof(address_) + sizeof(addrFrom_) + sizeof(sizeData_) + sizeof(char) + sizeof(int8_t);
+  static constexpr uint8_t MIN_PACKET_SIZE_ = 1 + sizeof(address_) + sizeof(addrFrom_) + sizeof(sizeData_) + sizeof(char) + sizeof(int8_t) + sizeof(int8_t);
 
 public:
 
@@ -42,7 +50,7 @@ public:
     return MIN_PACKET_SIZE_;
   }
 
-  void send(uint8_t address, char* data, uint16_t size);
+  void send(uint8_t address, char* data, uint16_t size, bool needCommiting = false);
   void sendBroadcast(char* data, uint16_t size);
   char* getData() {
     isData_ = false;
@@ -57,7 +65,7 @@ public:
 
   static int8_t crc8(char* buffer, uint16_t size);
   bool parsePacket();
-  void debugOutput(const char* message);
+  void debugOutput(const char* message, bool newLine = true);
 };
 
 SerialBus::SerialBus(Stream* stream, uint8_t address, uint16_t bufferSize)
@@ -72,12 +80,12 @@ SerialBus::SerialBus(Stream* stream, uint8_t address, uint16_t bufferSize)
 bool SerialBus::available() {
 
   if (isData_) {
-    debugOutput("isData_ ERROR!");
+    debugOutput("isData_ ERROR!", true);
     return true;
   }
 
   if (!stream_->available()) {
-    // debugOutput("!stream_->available() ERROR!");
+    // debugOutput("!stream_->available() ERROR!", true);
     return false;
   }
 
@@ -91,7 +99,7 @@ bool SerialBus::available() {
 
     if (addrTo_ == BROADCAST_ADDR || addrTo_ == address_) {
       isData_ = true;
-      debugOutput("DATA HIT!");
+      debugOutput("DATA HIT!", true);
       break;
     }
   }
@@ -111,7 +119,7 @@ uint8_t SerialBus::getTXaddress() const {
   return addrFrom_;
 }
 
-void SerialBus::send(uint8_t addressTo, char* data, uint16_t size) {
+void SerialBus::send(uint8_t addressTo, char* data, uint16_t size, bool needCommiting) {
   stream_->write(START_SYMBOL);
 
   stream_->write(addressTo);
@@ -127,6 +135,8 @@ void SerialBus::send(uint8_t addressTo, char* data, uint16_t size) {
   stream_->write(crc8(data, size));
   Serial.print("CRC = ");
   Serial.println(crc8(data, size));
+
+  Serial
 }
 
 void SerialBus::sendBroadcast(char* data, uint16_t size) {
@@ -141,14 +151,14 @@ bool SerialBus::parsePacket() {
   if (stream_->available() < MIN_PACKET_SIZE_) {
     delay(WAITING_DATA_TIMEOUT);
     if (stream_->available() < MIN_PACKET_SIZE_) {
-      debugOutput("MIN_PACKET_SIZE_ ERROR!");
+      debugOutput("MIN_PACKET_SIZE_ ERROR!", true);
       return false;
     }
   }
 
   while (stream_->read() != START_SYMBOL) {
     if (stream_->available() < MIN_PACKET_SIZE_) {
-      debugOutput("START_SYMBOL ERROR!");
+      debugOutput("START_SYMBOL ERROR!", true);
       return false;
     }
   }
@@ -162,7 +172,7 @@ bool SerialBus::parsePacket() {
   if (stream_->available() < sizeData_ + sizeof(int8_t)) {  // sizeData_ + crcSize
     delay(WAITING_DATA_TIMEOUT);
     if (stream_->available() < sizeData_ + sizeof(int8_t)) {
-      debugOutput("sizeData_ ERROR!");
+      debugOutput("sizeData_ ERROR!", true);
       return false;
     }
   }
@@ -171,9 +181,11 @@ bool SerialBus::parsePacket() {
 
   int8_t crc = stream_->read();
   if (crc != crc8(buffer_, sizeData_)) {
-    debugOutput("CRC ERROR!");
-    Serial.println(crc);
-    Serial.println(crc8(buffer_, sizeData_));
+    debugOutput("CRC ERROR! (crc -> ");
+    debugOutput(crc);
+    debugOutput(" != ");
+    debugOutput(crc8(buffer_, sizeData_));
+    debugOutput(")", true);
     return false;
   }
 
@@ -193,9 +205,10 @@ int8_t SerialBus::crc8(char* buffer, uint16_t size) {
   return crc;
 }
 
-void SerialBus::debugOutput(const char* message) {
+void SerialBus::debugOutput(const char* message, bool newLine) {
 #ifdef DEBUG_
-  Serial.println(message);
+  Serial.print(message);
+  if (newLine) { Serial.println(); }
 #endif
 }
 
