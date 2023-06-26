@@ -247,7 +247,7 @@ bool SerialBus::waitCommit() {
   bool isError = false;
   auto timer = millis();
 
-  while (!this->available()) {
+  while (stream_->available() < MIN_PACKET_SIZE_) {
     delay(1);
     if (millis() - timer > WAITING_SEND_COMMIT) {
       isError = true;
@@ -255,12 +255,16 @@ bool SerialBus::waitCommit() {
     }
   }
 
+  if (!isError) {
+    this->available();
+  }
+
   uint16_t sizeDataResponse = sizeData_;
 
   // restore state
 
   isData_ = isState;
-    
+
   if (isState) {
     debugOutput("restore state (waitCommit)");
     addrTo_ = addrToCopy;
@@ -277,7 +281,11 @@ bool SerialBus::waitCommit() {
     return true;
   }
 
-  debugOutput("commit ERROR! (waitCommit)");
+  debugOutput("commit ERROR! (waitCommit). INFO -> ", false);
+  debugOutput("Size response data - ", false);
+  debugOutput(String(sizeDataResponse).c_str());
+  debugOutput("timer flag - ", false);
+  debugOutput(isError ? "Timer ERROR" : "Timer is OK");
   return false;
 }
 
