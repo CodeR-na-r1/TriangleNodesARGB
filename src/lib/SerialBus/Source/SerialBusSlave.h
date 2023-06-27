@@ -1,25 +1,39 @@
 /*
 
+  Параметры конструктора:
+  TODO
+
   Структура пакета:
   TODO  
 
 */
 
 
-#ifndef SERIAL_BUS
-#define SERIAL_BUS
+#ifndef SERIAL_BUS_SLAVE
+#define SERIAL_BUS_SLAVE
 
+#include <SoftwareSerial.h>
+
+#define SERIAL_SPEED 9600
 #define START_SYMBOL 3
 #define WAITING_DATA_TIMEOUT 50
 #define WAITING_SEND_COMMIT 3000
 
 #define BROADCAST_ADDR 0
 
-class SerialBus {
+class SerialBusSlave {
 
 private:
 
-  Stream* stream_;
+  SoftwareSerial* stream_;
+  SoftwareSerial* stream2_;
+  SoftwareSerial* streamTemp_;
+
+  uint8_t pinRX_;
+  uint8_t pinTX_;
+
+  bool isRecieveMode_;
+
   uint8_t address_;
   uint16_t bufferSize_;
 
@@ -30,20 +44,15 @@ private:
   uint8_t addrFrom_;
   uint16_t sizeData_;
 
-  uint8_t maxRetries_ = 3;
-
   uint16_t errorCounter_ = 0;
   static constexpr uint8_t MIN_PACKET_SIZE_ = 1 + sizeof(address_) + sizeof(addrFrom_) + sizeof(sizeData_) + sizeof(char) + sizeof(int8_t) + sizeof(int8_t);
 
 public:
 
-  SerialBus(Stream* stream, uint8_t address, uint16_t bufferSize = 30);
+  SerialBusSlave(const uint8_t pinRX, const uint8_t pinTX, const uint8_t pinFake, const uint8_t address, const uint16_t bufferSize = 30);
 
   bool available();
   void changeAddress(const uint8_t addr);
-  void setRetries(uint8_t retries) {
-    maxRetries_ = retries;
-  }
 
   uint16_t getErrorCounter() const;
   uint8_t getTXaddress() const;
@@ -60,9 +69,11 @@ public:
   uint16_t getSizeData() {
     return sizeData_;
   }
-  void read();
 
   // private:
+
+  void activateRecieveMode();
+  void activateSendMode();
 
   static int8_t crc8(char* buffer, uint16_t size);
   bool parsePacket();
@@ -71,16 +82,23 @@ public:
   void debugOutput(const char* message, bool newLine = true);
 };
 
-SerialBus::SerialBus(Stream* stream, uint8_t address, uint16_t bufferSize)
-  : stream_(stream), address_(address), bufferSize_(bufferSize) {
+SerialBusSlave::SerialBusSlave(const uint8_t pinRX, const uint8_t pinTX, const uint8_t pinFake, const uint8_t address, const uint16_t bufferSize)
+  : pinRX_(pinRX), pinTX_(pinTX), stream2_(new SoftwareSerial(pinFake, pinTX)), stream_(new SoftwareSerial(pinRX, pinFake)), address_(address), bufferSize_(bufferSize) {
 
   if (bufferSize_ < 30)
     bufferSize_ = 30;
 
   buffer_ = new char[bufferSize_];
+
+  stream_->begin(SERIAL_SPEED);
+
+  stream2_->end();
+  pinMode(pinTX_, INPUT_PULLUP);
+
+  isRecieveMode_ = true;
 }
 
-bool SerialBus::available() {
+bool SerialBusSlave::available() {
 
   if (isData_) {
     debugOutput("isData_ ERROR!", true);
@@ -110,19 +128,21 @@ bool SerialBus::available() {
   return isData_;
 }
 
-void SerialBus::changeAddress(const uint8_t addr) {
+void SerialBusSlave::changeAddress(const uint8_t addr) {
   address_ = addr;
 }
 
-uint16_t SerialBus::getErrorCounter() const {
+uint16_t SerialBusSlave::getErrorCounter() const {
   return errorCounter_;
 }
 
-uint8_t SerialBus::getTXaddress() const {
+uint8_t SerialBusSlave::getTXaddress() const {
   return addrFrom_;
 }
 
-bool SerialBus::send(uint8_t addressTo, char* data, uint16_t size, bool needCommiting) {
+bool SerialBusSlave::send(uint8_t addressTo, char* data, uint16_t size, bool needCommiting) {
+  this->activateSendMode();
+
   stream_->write(START_SYMBOL);
 
   stream_->write(addressTo);
@@ -142,6 +162,8 @@ bool SerialBus::send(uint8_t addressTo, char* data, uint16_t size, bool needComm
   int8_t isCommitInt8 = (needCommiting ? 1 : 0);
   stream_->write(isCommitInt8);
 
+  this->activateRecieveMode();
+
   if (needCommiting) {
 
     return waitCommit();
@@ -150,14 +172,11 @@ bool SerialBus::send(uint8_t addressTo, char* data, uint16_t size, bool needComm
   return true;
 }
 
-void SerialBus::sendBroadcast(char* data, uint16_t size) {
+void SerialBusSlave::sendBroadcast(char* data, uint16_t size) {
   send(BROADCAST_ADDR, data, size);
 }
 
-void SerialBus::read() {
-}
-
-bool SerialBus::parsePacket() {
+bool SerialBusSlave::parsePacket() {
 
   if (stream_->available() < MIN_PACKET_SIZE_) {
     delay(WAITING_DATA_TIMEOUT);
@@ -202,7 +221,7 @@ bool SerialBus::parsePacket() {
 
   int8_t isCommit = stream_->read();
 
-  if (isCommit == 1) {
+  if (isCommit == 1 && addrTo_ == address_) {
     sendCommit();
     debugOutput("commit is send");
   }
@@ -210,7 +229,40 @@ bool SerialBus::parsePacket() {
   return true;
 }
 
-void SerialBus::sendCommit() {
+void SerialBusSlave::activateRecieveMode() {
+  if (isRecieveMode_) {
+    return;
+  }
+
+  stream_->end();
+  pinMode(pinTX_, INPUT_PULLUP);
+  streamTemp_ = stream_;
+  stream_ = stream2_;
+  stream2_ = streamTemp_;
+  stream_->begin(SERIAL_SPEED);
+  isRecieveMode_ = true;
+
+  debugOutput("activate Recieve Mode");
+}
+
+void SerialBusSlave::activateSendMode() {
+  if (!isRecieveMode_) {
+    return;
+  }
+
+  stream_->end();
+  streamTemp_ = stream_;
+  stream_ = stream2_;
+  stream2_ = streamTemp_;
+  stream_->begin(SERIAL_SPEED);
+  isRecieveMode_ = false;
+
+  debugOutput("activate Send Mode");
+}
+
+void SerialBusSlave::sendCommit() {
+  this->activateSendMode();
+
   stream_->write(START_SYMBOL);
 
   stream_->write(addrFrom_);
@@ -224,9 +276,11 @@ void SerialBus::sendCommit() {
   stream_->write(48);  // crc for data
 
   stream_->write(uint8_t(0));  // commit byte == false (0)
+
+  this->activateRecieveMode();
 }
 
-bool SerialBus::waitCommit() {
+bool SerialBusSlave::waitCommit() {
   // save state
 
   bool isState = isData_;
@@ -289,7 +343,7 @@ bool SerialBus::waitCommit() {
   return false;
 }
 
-int8_t SerialBus::crc8(char* buffer, uint16_t size) {
+int8_t SerialBusSlave::crc8(char* buffer, uint16_t size) {
   int8_t crc = 0;
 
   for (uint16_t i = 0; i < size; i++) {
@@ -302,7 +356,7 @@ int8_t SerialBus::crc8(char* buffer, uint16_t size) {
   return crc;
 }
 
-void SerialBus::debugOutput(const char* message, bool newLine) {
+void SerialBusSlave::debugOutput(const char* message, bool newLine) {
 #ifdef DEBUG_
   Serial.print(message);
   if (newLine) { Serial.println(); }
