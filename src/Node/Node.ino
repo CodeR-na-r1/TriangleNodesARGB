@@ -1,11 +1,12 @@
 #include <Ticker.h>  //Ticker Library
 
+// #define DEBUG_
+
 #include "SerialBusSlave.h"
 #include "MSG_TYPES.h"
 
-#define DEBUG_
-
 #define MSG_TIME_WAIT 300
+#define MSG_SEND_INTERVAL 200
 #define TIMEOUT_PING 25000
 
 #define RX_PIN 4     // D2
@@ -59,6 +60,8 @@ void setup() {
   Serial.println(bus.getAddress());
 }
 
+auto timerPingResponse = millis();
+
 void loop() {
 
   auto static timerLastPing = millis();
@@ -88,14 +91,19 @@ void loop() {
         break;
     }
 
+    Serial.print("getRXaddress=");
+    Serial.println(bus.getRXaddress());
+    Serial.print("getAddress=");
+    Serial.println(bus.getAddress());
     if (bus.getRXaddress() == bus.getAddress()) {
       timerLastPing = millis();
     }
   }
 
-  if (millis() - timerLastPing > TIMEOUT_PING) {
+  if (millis() - timerLastPing > TIMEOUT_PING && addrSuccess) {
 
     addrSuccess = false;
+    Serial.print("Addr lost!");
     // TODO SET RECONECT ANIMATION
   }
 
@@ -103,14 +111,23 @@ void loop() {
 
     if (addrSuccess) {
 
-      buffer[0] = static_cast<char>(MSG_TYPES::OK);
-      bus.send(1, buffer, 1);
+      if (millis() - timerPingResponse > MSG_SEND_INTERVAL) {
+
+        buffer[0] = static_cast<char>(MSG_TYPES::OK);
+        bus.send(1, buffer, 1);
+        timerPingResponse = millis();
+      }
     } else {
 
-      if (getAddr()) {  // пробуем получить адрес
+      if (millis() - timerPingResponse > MSG_SEND_INTERVAL) {
 
-        addrSuccess = true;
-        // TODO SET RAINBOW ANIMATION
+        if (getAddr()) {  // пробуем получить адрес
+
+          addrSuccess = true;
+          Serial.print("Addr restored!");
+          // TODO SET RAINBOW ANIMATION
+        }
+        timerPingResponse = millis();
       }
     }
   }
@@ -132,7 +149,7 @@ bool isPing() {
 
   if (!digitalRead(WDP_PIN)) {  // если нас опрашивают
 
-    Serial.println("WDP is active");
+    // Serial.println("WDP is active");
 
     auto timer = millis();
     bool flagSuccessful = false;
