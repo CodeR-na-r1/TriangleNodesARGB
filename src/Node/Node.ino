@@ -32,15 +32,15 @@ void setup() {
   digitalWrite(WDC0_PIN, LOW);
   digitalWrite(WDC1_PIN, LOW);
 
-  while (true) {
+  while (true) {  // дальше не идем пока не получим адрес
 
-    if (!digitalRead(WDP_PIN)) {
+    if (!digitalRead(WDP_PIN)) {  // если нас опрашивают
       Serial.println("WDP is active");
 
       auto timer = millis();
       bool flagSuccessful = false;
 
-      while (!digitalRead(WDP_PIN)) {
+      while (!digitalRead(WDP_PIN)) {  // проверяем некоторое время, что сигнал не пропал (защита от помех)
 
         if (millis() - timer > 20) {
 
@@ -50,34 +50,36 @@ void setup() {
         delay(1);
       }
 
-      if (flagSuccessful) {
+      if (flagSuccessful) {  // если не помехи
         Serial.println("Try get addr -> send broadcast");
 
         bus.clearBuffer();
 
-        buffer[0] = static_cast<char>(MSG_TYPES::GET_ADDR);
+        buffer[0] = static_cast<char>(MSG_TYPES::GET_ADDR);  // говорим что нам нужен адрес
         bus.send(1, buffer, 1);
 
-        if (!waitMessage()) {
+        if (!waitMessage()) {  // не дождались ответа
           Serial.println("!ERROR Try get addr -> no msg");
           continue;
         }
 
-        if (bus.getData()[0] != static_cast<char>(MSG_TYPES::SET_ADDR)) {
+        if (bus.getData()[0] != static_cast<char>(MSG_TYPES::SET_ADDR)) {  // не тот тип ответа
           Serial.println("!ERROR Try get addr -> miss type msg (!= ::SET_ADDR)");
           continue;
         }
 
-        uint8_t newAddr = bus.getData()[1];
-        bus.changeAddress(newAddr);
+        uint8_t newAddr = bus.getData()[1];  // если до сюда дошли, значит мы получили адрес
+        bus.changeAddress(newAddr);  // меняем свой адрес
 
-        buffer[0] = static_cast<char>(MSG_TYPES::PONG);
+        buffer[0] = static_cast<char>(MSG_TYPES::PONG);  // отмечаемся
         bus.send(1, buffer, 1);
 
         break;
       }
     } else {
-      bus.clearBuffer();
+      bus.clearBuffer();  // пока мы ждем, 
+                          // возможно сейчас присвают адрес другим slave при помощи широковещательного сообщения - нам это не нужно,
+                          // поэтому чистим буфер
     }
   }
 
