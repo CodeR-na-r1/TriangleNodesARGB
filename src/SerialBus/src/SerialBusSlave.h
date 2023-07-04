@@ -54,7 +54,16 @@ public:
   bool available();
   void changeAddress(const uint8_t addr);
 
+  void clearBuffer() {
+    if (stream_->available()) {
+      stream_->readBytes(buffer_, stream_->available());
+      debugOutput("clearBuffer", true);
+    }
+    isData_ = false;
+  }
   uint16_t getErrorCounter() const;
+  uint8_t getAddress() const;
+  uint8_t getRXaddress() const;
   uint8_t getTXaddress() const;
   static uint8_t getPacketSize() {
     return MIN_PACKET_SIZE_;
@@ -134,6 +143,14 @@ void SerialBusSlave::changeAddress(const uint8_t addr) {
 
 uint16_t SerialBusSlave::getErrorCounter() const {
   return errorCounter_;
+}
+
+uint8_t SerialBusSlave::getAddress() const {
+  return address_;
+}
+
+uint8_t SerialBusSlave::getRXaddress() const {
+  return addrTo_;
 }
 
 uint8_t SerialBusSlave::getTXaddress() const {

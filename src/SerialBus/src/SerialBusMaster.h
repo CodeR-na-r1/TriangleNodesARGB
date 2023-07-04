@@ -43,6 +43,13 @@ public:
   bool available();
   void changeAddress(const uint8_t addr);
 
+  void clearBuffer() {
+    if (stream_->available()) {
+      stream_->readBytes(buffer_, stream_->available());
+      debugOutput("clearBuffer", true);
+    }
+    isData_ = false;
+  }
   uint16_t getErrorCounter() const;
   uint8_t getTXaddress() const;
   static uint8_t getPacketSize() {
