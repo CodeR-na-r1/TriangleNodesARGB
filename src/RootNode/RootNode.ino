@@ -5,7 +5,8 @@
 
 #define DEBUG_
 
-#define MSG_TIME_WAIT 180
+#define MSG_TIME_WAIT 230
+#define PING_PONG_FREQUENCY 180
 
 #define RX_PIN 4  // D2
 #define TX_PIN 0  // D3
@@ -48,8 +49,54 @@ void setup() {
   Serial.println("first node find");
 }
 
+auto timerPingPong = millis();
+uint8_t nodeIterator = 0;
+bool isSecondNeigbour = false;
+
 void loop() {
-  delay(100);
+
+  if (millis() - timerPingPong > PING_PONG_FREQUENCY) {
+
+    buffer[0] = static_cast<char>(MSG_TYPES::PING);
+    bus.send(nodes[nodeIterator], buffer, 1);
+
+    if (waitMessage()) {
+
+      if (bus.getData()[0] == static_cast<char>(MSG_TYPES::PONG)) {
+
+        buffer[0] = static_cast<char>(isSecondNeigbour == false ? MSG_TYPES::SET_WD_0 : MSG_TYPES::SET_WD_1);
+        bus.send(nodes[nodeIterator], buffer, 1);
+
+        if (waitMessage()) {  // получили ответ от ноды (либо у которой есть адрес, либо нету)
+
+          if (bus.getData()[0] != static_cast<char>(MSG_TYPES::OK)) {  // (которая отреагировала на watch dog (то есть безАдресная))
+            assignAddress();                                           // попытка дать адрес
+          }
+        }
+
+        buffer[0] = static_cast<char>(MSG_TYPES::RESET_WDs);
+        bus.send(nodes[nodeIterator], buffer, 1);
+      }
+    } else {
+
+      Serial.print("Erase node, remains -> ");
+      nodes.erase(std::next(nodes.begin(), nodeIterator));
+      Serial.println(nodes.size());
+    }
+
+    if (isSecondNeigbour == false) {
+      isSecondNeigbour = true;
+    } else {
+      isSecondNeigbour = false;
+      ++nodeIterator;
+      if (nodeIterator >= nodes.size()) { nodeIterator = 0; }
+    }
+
+    timerPingPong = millis();
+  }
+
+  // TODO handler for queue msgs from serverCallback or microPhone and others
+  // Add packets for led strip commands
 }
 
 bool waitMessage() {
