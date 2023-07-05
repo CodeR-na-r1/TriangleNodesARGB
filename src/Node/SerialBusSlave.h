@@ -1,10 +1,16 @@
 /*
 
-  Параметры конструктора:
-  TODO
-
   Структура пакета:
-  TODO  
+  
+  Size (bytes) | Description
+
+        1      | START_SYMBOL
+        1      | addressTo
+        1      | addressFrom
+        2      | size data
+    size data  | data
+        1      | CRC_8
+        1      | isNeedCommit
 
 */
 
