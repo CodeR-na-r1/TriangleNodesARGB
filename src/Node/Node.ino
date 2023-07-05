@@ -4,10 +4,13 @@
 
 #include "SerialBusSlave.h"
 #include "MSG_TYPES.h"
+#include "LedManager.h"
 
 #define MSG_TIME_WAIT 300
 #define MSG_SEND_INTERVAL 200
 #define TIMEOUT_PING 25000
+
+#define FREQUENCY_UPDATE_LED_FOR_LOADING 100
 
 #define RX_PIN 4     // D2
 #define TX_PIN 0     // D3
@@ -23,6 +26,9 @@
 SerialBusSlave bus = SerialBusSlave(RX_PIN, TX_PIN, FAKE_PIN, BROADCAST_ADDR, 100);  // RX 2 TX 3 Fake 0 addr 0 bufSz 100
 char* buffer = new char[100];
 
+LedManager ledManager;
+Ticker ticker;
+
 bool addrSuccess = false;
 
 void setup() {
@@ -37,6 +43,8 @@ void setup() {
   digitalWrite(WDC1_PIN, HIGH);
 
   // TODO SET LOADING ANIMATION
+  ledManager.initLoadAnimation(ColorRGB(255, 0, 0), ColorRGB(0, 0, 0), 0, 3, 1);
+  ticker.attach_ms(FREQUENCY_UPDATE_LED_FOR_LOADING, interruptFunction);
 
   while (true) {  // дальше не идем пока не получим адрес
 
@@ -58,6 +66,10 @@ void setup() {
   Serial.println("ESP ready");
   Serial.print("Addr =");
   Serial.println(bus.getAddress());
+
+  ticker.detach();
+  ledManager.initLoadAnimation(ColorRGB(122, 122, 230), ColorRGB(0, 0, 0), 0, 3, 1);
+  ticker.attach_ms(FREQUENCY_UPDATE_LED_FOR_LOADING, interruptFunction);
 }
 
 auto timerPingResponse = millis();
@@ -105,6 +117,9 @@ void loop() {
     addrSuccess = false;
     Serial.print("Addr lost!");
     // TODO SET RECONECT ANIMATION
+    ticker.detach();
+    ledManager.initLoadAnimation(ColorRGB(255, 0, 0), ColorRGB(0, 0, 0), 0, 3, 1);
+    ticker.attach_ms(FREQUENCY_UPDATE_LED_FOR_LOADING, interruptFunction);
   }
 
   if (isPing()) {
@@ -126,6 +141,9 @@ void loop() {
           addrSuccess = true;
           Serial.print("Addr restored!");
           // TODO SET RAINBOW ANIMATION
+          ticker.detach();
+          ledManager.initLoadAnimation(ColorRGB(122, 122, 230), ColorRGB(0, 0, 0), 0, 3, 1);
+          ticker.attach_ms(FREQUENCY_UPDATE_LED_FOR_LOADING, interruptFunction);
         }
         timerPingResponse = millis();
       }
@@ -196,4 +214,9 @@ bool getAddr() {
   bus.send(1, buffer, 1);
 
   return true;
+}
+
+IRAM_ATTR void interruptFunction() {
+
+  ledManager.tickLoadAnimation();
 }
