@@ -35,6 +35,9 @@ bool addrSuccess = false;
 auto timerPingResponse = millis();
 auto timerLastPing = millis();
 
+ColorRGB color = ColorRGB(59, 26, 93);
+ARGB_MODES mode = ARGB_MODES::STATIC_COLOR;
+
 void setup() {
   Serial.begin(9600);
   Serial.println("ESP started");
@@ -109,6 +112,19 @@ void loop() {
         digitalWrite(WDC0_PIN, HIGH);
         digitalWrite(WDC1_PIN, HIGH);
         break;
+
+      case static_cast<char>(MSG_TYPES::BRIGHTNESS):
+        ledManager.setBrightness(bus.getData()[1]);
+        break;
+
+      case static_cast<char>(MSG_TYPES::LED_COLOR_INFO):
+        color = ColorRGB(bus.getData()[1], bus.getData()[2], bus.getData()[3]);
+        ledManager.showColor(color);
+        break;
+
+      case static_cast<char>(MSG_TYPES::LED_MODE_INFO):
+        mode = static_cast<ARGB_MODES>(bus.getData()[1]);
+        break;
     }
 
     Serial.print("getRXaddress=");
@@ -151,8 +167,7 @@ void loop() {
           Serial.print("Addr restored!");
           // TODO SET RAINBOW ANIMATION
           ticker.detach();
-          ledManager.initLoadAnimation(ColorRGB(122, 122, 230), ColorRGB(0, 0, 0), 0, 3, 1);
-          ticker.attach_ms(FREQUENCY_UPDATE_LED_FOR_LOADING, interruptFunction);
+          // todo return led anim mode
         }
         timerPingResponse = millis();
       }

@@ -53,7 +53,9 @@ void setup() {
   if (ret == 0) {
     Serial.println("Server started;");
 
-    SERVER_NAMESPACE::setUserCallback(serverCallback);
+    SERVER_NAMESPACE::setuserCahngeColorCallback(serverChangeColorCallback);
+    SERVER_NAMESPACE::setuserCahngeBrightnessCallback(serverChangeBrightnessCallback);
+    SERVER_NAMESPACE::setuserCahngeModeCallback(serverChangeModeCallback);
     Serial.println("setUserCallback is set");
   } else {
     Serial.print("Server started, with error, retValue -> ");
@@ -150,8 +152,6 @@ void loop() {
       buffer[0] = static_cast<char>(MSG_TYPES::SET_TIMEOUT_PING);
       buffer[1] = nodes.size() & 0xFF;
       bus.sendBroadcast(buffer, 2);
-      Serial.print("SET_TIMEOUT_PING = ");
-      Serial.println(static_cast<uint32_t>(buffer[1]));
 
       nodeIterator = nodeIterator % nodes.size();
       Serial.print("nodeIterator = ");
@@ -170,8 +170,13 @@ void loop() {
     timerPingPong = millis();
   }
 
-  // TODO handler for queue msgs from serverCallback or microPhone and others
-  // Add packets for led strip commands
+  // handler for queue msgs from serverCallback or microPhone and others
+
+  if (isQueueData) {
+
+    bus.sendBroadcast(queueBuffer, queueSize);
+    isQueueData = false;
+  }
 }
 
 bool waitMessage() {
@@ -205,7 +210,16 @@ bool assignAddress() {
   return false;
 }
 
-void serverCallback(String _r, String _g, String _b) {
+void serverChangeColorCallback(String _r, String _g, String _b) {
+
+  queueBuffer[0] = static_cast<char>(MSG_TYPES::LED_COLOR_INFO);
+  queueBuffer[1] = atoi(_r.c_str());
+  queueBuffer[2] = atoi(_g.c_str());
+  queueBuffer[3] = atoi(_b.c_str());
+
+  isQueueData = true;
+
+  queueSize = 4;
 
   Serial.print("r = ");
   Serial.println(_r);
@@ -215,8 +229,42 @@ void serverCallback(String _r, String _g, String _b) {
 
   Serial.print("b = ");
   Serial.println(_b);
-  
+}
 
-  // todo show colors on YOUR FUCKING LED
+void serverChangeBrightnessCallback(String _brightness) {
 
+  queueBuffer[0] = static_cast<char>(MSG_TYPES::BRIGHTNESS);
+  queueBuffer[1] = atoi(_brightness.c_str());
+
+  isQueueData = true;
+
+  queueSize = 2;
+
+  Serial.print("brightness = ");
+  Serial.println(_brightness);
+}
+
+void serverChangeModeCallback(String _mode) {
+
+  queueBuffer[0] = static_cast<char>(MSG_TYPES::LED_MODE_INFO);
+
+  if (_mode == "Static") {
+
+    queueBuffer[1] = static_cast<char>(ARGB_MODES::STATIC_COLOR);
+
+  } else if (_mode == "StaticAnim") {
+
+    queueBuffer[1] = static_cast<char>(ARGB_MODES::STATIC_COLOR_ANIM);
+
+  } else if (_mode == "Rainbow") {
+
+    queueBuffer[1] = static_cast<char>(ARGB_MODES::RAINBOW_ANIM);
+  }
+
+  isQueueData = true;
+
+  queueSize = 2;
+
+  Serial.print("mode = ");
+  Serial.println(_mode);
 }

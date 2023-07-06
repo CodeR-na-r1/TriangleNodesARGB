@@ -4,7 +4,7 @@
 
 
 #ifndef WIFI_MODULE
-#include "esp_wifi_module.hpp"
+#include "WiFiModule.h"
 #endif
 
 #ifndef Arduino_LIB

@@ -11,6 +11,7 @@ enum class MSG_TYPES {
   RESET_WDs,
 
   BRIGHTNESS,
+  LED_COLOR_INFO,
   LED_MODE_INFO,
 
 };
