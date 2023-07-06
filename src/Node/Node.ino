@@ -8,9 +8,10 @@
 
 #define MSG_TIME_WAIT 300
 #define MSG_SEND_INTERVAL 200
-#define TIMEOUT_PING 25000
+const uint32_t MULTIPLIER_TIMEOUT_PING = 4000;
+uint32_t TIMEOUT_PING = MULTIPLIER_TIMEOUT_PING * 1;
 
-#define FREQUENCY_UPDATE_LED_FOR_LOADING 100
+#define FREQUENCY_UPDATE_LED_FOR_LOADING 70
 
 #define RX_PIN 4     // D2
 #define TX_PIN 0     // D3
@@ -30,6 +31,8 @@ LedManager ledManager;
 Ticker ticker;
 
 bool addrSuccess = false;
+auto timerPingResponse = millis();
+auto timerLastPing = millis();
 
 void setup() {
   Serial.begin(9600);
@@ -70,13 +73,12 @@ void setup() {
   ticker.detach();
   ledManager.initLoadAnimation(ColorRGB(122, 122, 230), ColorRGB(0, 0, 0), 0, 3, 1);
   ticker.attach_ms(FREQUENCY_UPDATE_LED_FOR_LOADING, interruptFunction);
+
+  timerPingResponse = millis();
+  timerLastPing = millis();
 }
 
-auto timerPingResponse = millis();
-
 void loop() {
-
-  auto static timerLastPing = millis();
 
   if (bus.available()) {
 
@@ -87,6 +89,11 @@ void loop() {
       case static_cast<char>(MSG_TYPES::PING):
         buffer[0] = static_cast<char>(MSG_TYPES::PONG);
         bus.send(1, buffer, 1);
+        break;
+
+      case static_cast<char>(MSG_TYPES::SET_TIMEOUT_PING):
+        TIMEOUT_PING = MULTIPLIER_TIMEOUT_PING * bus.getData()[1];
+        timerLastPing = millis();
         break;
 
       case static_cast<char>(MSG_TYPES::SET_WD_0):
@@ -108,11 +115,12 @@ void loop() {
     Serial.print("getAddress=");
     Serial.println(bus.getAddress());
     if (bus.getRXaddress() == bus.getAddress()) {
+      Serial.print("update timerLastPing");
       timerLastPing = millis();
     }
   }
 
-  if (millis() - timerLastPing > TIMEOUT_PING && addrSuccess) {
+  if ((millis() - timerLastPing > TIMEOUT_PING) && addrSuccess) {
 
     addrSuccess = false;
     Serial.print("Addr lost!");

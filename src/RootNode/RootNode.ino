@@ -21,6 +21,8 @@ char* buffer = nullptr;
 std::vector<uint8_t> nodes;
 uint8_t freeAddr = 2;
 
+auto timerPingPong = millis();
+
 void setup() {
   Serial.begin(9600);
   mySerial.begin(9600);
@@ -47,9 +49,10 @@ void setup() {
     }
   }
   Serial.println("first node find");
+
+  timerPingPong = millis();
 }
 
-auto timerPingPong = millis();
 uint8_t nodeIterator = 0;
 bool isSecondNeigbour = false;
 
@@ -71,14 +74,21 @@ void loop() {
 
         if (waitMessage()) {  // получили ответ от ноды (либо у которой есть адрес, либо нету)
 
-          if (bus.getData()[0] != static_cast<char>(MSG_TYPES::OK)) {  // (которая отреагировала на watch dog (то есть безАдресная))
-            Serial.print("addr  node intent = ");
-            Serial.println(nodes[nodeIterator]);
-            Serial.print("isSecondNeigbour = ");
-            Serial.println(isSecondNeigbour);
-            Serial.print("TYPE_MSG  = ");
-            Serial.println(static_cast<int>(bus.getData()[0]));
-            assignAddress();  // попытка дать адрес
+          Serial.print("after pong (response OK (0) or GET_ADDR(1))\naddr  node intent = ");
+          Serial.println(nodes[nodeIterator]);
+          Serial.print("isSecondNeigbour = ");
+          Serial.println(isSecondNeigbour);
+          Serial.print("TYPE_MSG  = ");
+          Serial.println(static_cast<int>(bus.getData()[0]));
+
+          if (bus.getData()[0] == static_cast<char>(MSG_TYPES::GET_ADDR)) {  // (которая отреагировала на watch dog (то есть безАдресная))
+
+            if (assignAddress()) {  // попытка дать адрес
+
+              buffer[0] = static_cast<char>(MSG_TYPES::SET_TIMEOUT_PING);
+              buffer[1] = nodes.size() & 0xFF;
+              bus.sendBroadcast(buffer, 2);
+            }
           }
         }
 
@@ -105,7 +115,15 @@ void loop() {
         ESP.reset();
       }
 
+      buffer[0] = static_cast<char>(MSG_TYPES::SET_TIMEOUT_PING);
+      buffer[1] = nodes.size() & 0xFF;
+      bus.sendBroadcast(buffer, 2);
+      Serial.print("SET_TIMEOUT_PING = ");
+      Serial.println(static_cast<uint32_t>(buffer[1]));
+
       nodeIterator = nodeIterator % nodes.size();
+      Serial.print("nodeIterator = ");
+      Serial.println(nodeIterator);
       isSecondNeigbour = false;
     }
 
