@@ -1,5 +1,9 @@
 #include <FastLED.h>  // https://kit.alexgyver.ru/tutorials/address-strip/
 
+#include "CRGB_COLORS.h"
+
+extern CRGB CRGBColors[];
+
 #ifndef LED_PIN
 #define LED_PIN 5  // GPIO5 -> D1
 #endif
@@ -28,6 +32,8 @@ public:
 namespace LED_MANAGER {
 
 // for dynamic animation (loading)
+
+
 
 ColorRGB foregroundColor = ColorRGB(0, 0, 0);
 ColorRGB backgroundColor = ColorRGB(0, 0, 0);
@@ -95,6 +101,8 @@ void showColor(ColorRGB _color) {
 }
 
 void tickStaticColor() {
+  CRGB color = CRGBColors[constrain(random(0, CRGB_COLORS_SIZE + 1), 0, CRGB_COLORS_SIZE - 1)];
+  FastLED.showColor(color);
 }
 
 void rainbow_fade() {

@@ -37,13 +37,15 @@ auto timerPingResponse = millis();
 auto timerLastPing = millis();
 
 ColorRGB color = ColorRGB(59, 26, 93);
-ColorRGB colorBackground = ColorRGB(99, 255, 99);
+ColorRGB colorBackground = ColorRGB(0, 0, 0);
 ARGB_MODES mode = ARGB_MODES::STATIC_COLOR;
 uint8_t timeDelayAnimation = 60;
 
 void setup() {
   Serial.begin(9600);
   Serial.println("ESP started");
+
+  LED_MANAGER::setUp();
 
   pinMode(WDP_PIN, INPUT_PULLUP);
   pinMode(WDC0_PIN, OUTPUT);
@@ -80,6 +82,7 @@ void setup() {
 
   LED_MANAGER::setBrightness(255);
   mode = ARGB_MODES::ANIMATION;
+  color = ColorRGB(23, 8, 59);
   LED_MANAGER::initLoadAnimation(color, colorBackground, 0, 3, 1);
   timeDelayAnimation = 240;
   reInitAnimation();
@@ -121,10 +124,12 @@ void loop() {
 
       case static_cast<char>(MSG_TYPES::BRIGHTNESS):
         LED_MANAGER::setBrightness(bus.getData()[1]);
+        reInitAnimation();
         break;
 
       case static_cast<char>(MSG_TYPES::LED_COLOR_INFO):
         color = ColorRGB(bus.getData()[1], bus.getData()[2], bus.getData()[3]);
+        reInitAnimation();
         break;
 
       case static_cast<char>(MSG_TYPES::LED_MODE_INFO):
@@ -253,27 +258,31 @@ void reInitAnimation() {
 
   ticker.detach();
 
-  switch (static_cast<int>(mode)) {
+  Serial.println("reinit");
 
-    case static_cast<int>(ARGB_MODES::STATIC_COLOR):
-      LED_MANAGER::showColor(color);
-      break;
+  if (mode == ARGB_MODES::STATIC_COLOR) {
 
-    case static_cast<int>(ARGB_MODES::STATIC_COLOR_ANIM):
-      LED_MANAGER::ledFunction = LED_MANAGER::tickStaticColor;
-      ticker.attach_ms(timeDelayAnimation, interruptFunction);
-      break;
 
-    case static_cast<int>(ARGB_MODES::ANIMATION):
-      LED_MANAGER::ledFunction = LED_MANAGER::tickAnimation;
-      ticker.attach_ms(timeDelayAnimation, interruptFunction);
-      break;
+    Serial.println("staticColor");
+    LED_MANAGER::showColor(color);
 
-    case static_cast<int>(ARGB_MODES::RAINBOW_ANIM):
-      LED_MANAGER::ledFunction = LED_MANAGER::rainbow_fade;
-      // timeDelayAnimation = 20;
-      ticker.attach_ms(20, interruptFunction);
-      break;
+  } else if (mode == ARGB_MODES::STATIC_COLOR_ANIM) {
+
+    LED_MANAGER::ledFunction = LED_MANAGER::tickStaticColor;
+
+    if (timeDelayAnimation < 100) { timeDelayAnimation = 120; }  // remove it if user setting delay in web-interface
+    ticker.attach_ms(timeDelayAnimation, interruptFunction);
+
+  } else if (mode == ARGB_MODES::ANIMATION) {
+
+    LED_MANAGER::ledFunction = LED_MANAGER::tickAnimation;
+    ticker.attach_ms(timeDelayAnimation, interruptFunction);
+
+  } else if (mode == ARGB_MODES::RAINBOW_ANIM) {
+
+    LED_MANAGER::ledFunction = LED_MANAGER::rainbow_fade;
+    // timeDelayAnimation = 20;
+    ticker.attach_ms(20, interruptFunction);
   }
 }
 

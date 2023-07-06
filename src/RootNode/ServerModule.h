@@ -99,6 +99,7 @@ void initHTML() {
   html += "<select id=\"mode\" name=\"modeChoise\">\n";
   html += "<option value=\"Static\">Static color</option>";
   html += "<option value=\"StaticAnim\">Static color animation</option>";
+  html += "<option value=\"Animation\">Load animation</option>";
   html += "<option value=\"Rainbow\">Rainbow animation</option>";
   html += "</select>\n";
   html += "</p>\n";

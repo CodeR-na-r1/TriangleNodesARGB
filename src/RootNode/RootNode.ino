@@ -256,6 +256,10 @@ void serverChangeModeCallback(String _mode) {
 
     queueBuffer[1] = static_cast<char>(ARGB_MODES::STATIC_COLOR_ANIM);
 
+  } else if (_mode == "Animation") {
+
+    queueBuffer[1] = static_cast<char>(ARGB_MODES::ANIMATION);
+
   } else if (_mode == "Rainbow") {
 
     queueBuffer[1] = static_cast<char>(ARGB_MODES::RAINBOW_ANIM);
