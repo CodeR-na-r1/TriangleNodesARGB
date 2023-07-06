@@ -7,8 +7,8 @@
 #include "ServerModule.h"
 #include "ARGB_MODES.h"
 
-#define MSG_TIME_WAIT 200
-#define PING_PONG_FREQUENCY 700
+#define MSG_TIME_WAIT 250
+#define PING_PONG_FREQUENCY 850
 
 #define RX_PIN 4  // D2
 #define TX_PIN 0  // D3
