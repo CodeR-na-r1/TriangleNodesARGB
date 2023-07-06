@@ -4,6 +4,7 @@
 
 #include "SerialBusSlave.h"
 #include "MSG_TYPES.h"
+#include "ARGB_MODES.h"
 #include "LedManager.h"
 
 #define MSG_TIME_WAIT 300
@@ -45,9 +46,9 @@ void setup() {
   digitalWrite(WDC0_PIN, HIGH);
   digitalWrite(WDC1_PIN, HIGH);
 
-  // TODO SET LOADING ANIMATION
-  ledManager.initLoadAnimation(ColorRGB(255, 0, 0), ColorRGB(0, 0, 0), 0, 3, 1);
-  ticker.attach_ms(FREQUENCY_UPDATE_LED_FOR_LOADING, interruptFunction);
+  // SET LOADING STATIC COLOR
+  ledManager.setBrightness(80);
+  ledManager.showColor(ColorRGB(255, 255, 255));
 
   while (true) {  // дальше не идем пока не получим адрес
 
@@ -70,9 +71,9 @@ void setup() {
   Serial.print("Addr =");
   Serial.println(bus.getAddress());
 
-  ticker.detach();
-  ledManager.initLoadAnimation(ColorRGB(122, 122, 230), ColorRGB(0, 0, 0), 0, 3, 1);
-  ticker.attach_ms(FREQUENCY_UPDATE_LED_FOR_LOADING, interruptFunction);
+  // ticker.detach();
+  ledManager.initLoadAnimation(ColorRGB(59, 26, 93), ColorRGB(99, 255, 99), 0, 3, 1);
+  ticker.attach_ms(60, interruptFunction);
 
   timerPingResponse = millis();
   timerLastPing = millis();

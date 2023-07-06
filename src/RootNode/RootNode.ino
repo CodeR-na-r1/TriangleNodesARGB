@@ -4,6 +4,8 @@
 
 #include "SerialBusMaster.h"
 #include "MSG_TYPES.h"
+#include "ServerModule.h"
+#include "ARGB_MODES.h"
 
 #define MSG_TIME_WAIT 200
 #define PING_PONG_FREQUENCY 700
@@ -23,10 +25,40 @@ uint8_t freeAddr = 2;
 
 auto timerPingPong = millis();
 
+/* address strip parameters */
+
+uint8_t brightness = 255;
+uint8_t mode = static_cast<uint8_t>(ARGB_MODES::STATIC_COLOR);
+uint8_t rColor = 59;
+uint8_t gColor = 26;
+uint8_t bColor = 93;
+
+char* queueBuffer = new char[20];
+uint8_t queueSize = 0;
+bool isQueueData = false;
+
 void setup() {
   Serial.begin(9600);
   mySerial.begin(9600);
   Serial.println("ESP started");
+
+  if (WIFI_AP_NAMESPACE::start() == 0) {
+    Serial.println("WIFI AP created");
+  } else {
+    Serial.println("Wifi AP created error!");
+  }
+
+  int ret = SERVER_NAMESPACE::start();
+
+  if (ret == 0) {
+    Serial.println("Server started;");
+
+    SERVER_NAMESPACE::setUserCallback(serverCallback);
+    Serial.println("setUserCallback is set");
+  } else {
+    Serial.print("Server started, with error, retValue -> ");
+    Serial.println(ret);
+  }
 
   buffer = new char[100];
 
@@ -171,4 +203,20 @@ bool assignAddress() {
   }
 
   return false;
+}
+
+void serverCallback(String _r, String _g, String _b) {
+
+  Serial.print("r = ");
+  Serial.println(_r);
+
+  Serial.print("g = ");
+  Serial.println(_g);
+
+  Serial.print("b = ");
+  Serial.println(_b);
+  
+
+  // todo show colors on YOUR FUCKING LED
+
 }

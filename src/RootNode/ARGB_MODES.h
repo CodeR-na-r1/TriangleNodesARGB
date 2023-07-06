@@ -1,0 +1,7 @@
+enum class ARGB_MODES {
+
+  STATIC_COLOR,
+  STATIC_COLOR_ANIM,
+  RAINBOW_ANIM,
+
+};
