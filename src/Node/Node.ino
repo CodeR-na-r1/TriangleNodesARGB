@@ -28,7 +28,8 @@ uint32_t TIMEOUT_PING = MULTIPLIER_TIMEOUT_PING * 1;
 SerialBusSlave bus = SerialBusSlave(RX_PIN, TX_PIN, FAKE_PIN, BROADCAST_ADDR, 100);  // RX 2 TX 3 Fake 0 addr 0 bufSz 100
 char* buffer = new char[100];
 
-LedManager ledManager;
+// void (*animationFunction)() = nullptr;
+
 Ticker ticker;
 
 bool addrSuccess = false;
@@ -36,7 +37,9 @@ auto timerPingResponse = millis();
 auto timerLastPing = millis();
 
 ColorRGB color = ColorRGB(59, 26, 93);
+ColorRGB colorBackground = ColorRGB(99, 255, 99);
 ARGB_MODES mode = ARGB_MODES::STATIC_COLOR;
+uint8_t timeDelayAnimation = 60;
 
 void setup() {
   Serial.begin(9600);
@@ -50,8 +53,9 @@ void setup() {
   digitalWrite(WDC1_PIN, HIGH);
 
   // SET LOADING STATIC COLOR
-  ledManager.setBrightness(80);
-  ledManager.showColor(ColorRGB(255, 255, 255));
+  LED_MANAGER::setBrightness(80);
+  color = ColorRGB(255, 255, 255);
+  reInitAnimation();
 
   while (true) {  // дальше не идем пока не получим адрес
 
@@ -74,9 +78,11 @@ void setup() {
   Serial.print("Addr =");
   Serial.println(bus.getAddress());
 
-  // ticker.detach();
-  ledManager.initLoadAnimation(ColorRGB(59, 26, 93), ColorRGB(99, 255, 99), 0, 3, 1);
-  ticker.attach_ms(60, interruptFunction);
+  LED_MANAGER::setBrightness(255);
+  mode = ARGB_MODES::ANIMATION;
+  LED_MANAGER::initLoadAnimation(color, colorBackground, 0, 3, 1);
+  timeDelayAnimation = 240;
+  reInitAnimation();
 
   timerPingResponse = millis();
   timerLastPing = millis();
@@ -114,16 +120,16 @@ void loop() {
         break;
 
       case static_cast<char>(MSG_TYPES::BRIGHTNESS):
-        ledManager.setBrightness(bus.getData()[1]);
+        LED_MANAGER::setBrightness(bus.getData()[1]);
         break;
 
       case static_cast<char>(MSG_TYPES::LED_COLOR_INFO):
         color = ColorRGB(bus.getData()[1], bus.getData()[2], bus.getData()[3]);
-        ledManager.showColor(color);
         break;
 
       case static_cast<char>(MSG_TYPES::LED_MODE_INFO):
         mode = static_cast<ARGB_MODES>(bus.getData()[1]);
+        reInitAnimation();
         break;
     }
 
@@ -142,9 +148,10 @@ void loop() {
     addrSuccess = false;
     Serial.print("Addr lost!");
     // TODO SET RECONECT ANIMATION
-    ticker.detach();
-    ledManager.initLoadAnimation(ColorRGB(255, 0, 0), ColorRGB(0, 0, 0), 0, 3, 1);
-    ticker.attach_ms(FREQUENCY_UPDATE_LED_FOR_LOADING, interruptFunction);
+    LED_MANAGER::initLoadAnimation(ColorRGB(255, 0, 0), ColorRGB(0, 0, 0), 0, 3, 1);
+    mode = ARGB_MODES::ANIMATION;
+    timeDelayAnimation = 80;
+    reInitAnimation();
   }
 
   if (isPing()) {
@@ -165,9 +172,11 @@ void loop() {
 
           addrSuccess = true;
           Serial.print("Addr restored!");
-          // TODO SET RAINBOW ANIMATION
-          ticker.detach();
-          // todo return led anim mode
+          // SET DEFAULT ANIMATION
+          mode = ARGB_MODES::ANIMATION;
+          LED_MANAGER::initLoadAnimation(color, colorBackground, 0, 3, 1);
+          timeDelayAnimation = 240;
+          reInitAnimation();
         }
         timerPingResponse = millis();
       }
@@ -240,7 +249,35 @@ bool getAddr() {
   return true;
 }
 
+void reInitAnimation() {
+
+  ticker.detach();
+
+  switch (static_cast<int>(mode)) {
+
+    case static_cast<int>(ARGB_MODES::STATIC_COLOR):
+      LED_MANAGER::showColor(color);
+      break;
+
+    case static_cast<int>(ARGB_MODES::STATIC_COLOR_ANIM):
+      LED_MANAGER::ledFunction = LED_MANAGER::tickStaticColor;
+      ticker.attach_ms(timeDelayAnimation, interruptFunction);
+      break;
+
+    case static_cast<int>(ARGB_MODES::ANIMATION):
+      LED_MANAGER::ledFunction = LED_MANAGER::tickAnimation;
+      ticker.attach_ms(timeDelayAnimation, interruptFunction);
+      break;
+
+    case static_cast<int>(ARGB_MODES::RAINBOW_ANIM):
+      LED_MANAGER::ledFunction = LED_MANAGER::rainbow_fade;
+      // timeDelayAnimation = 20;
+      ticker.attach_ms(20, interruptFunction);
+      break;
+  }
+}
+
 IRAM_ATTR void interruptFunction() {
 
-  ledManager.tickLoadAnimation();
+  LED_MANAGER::ledFunction();
 }

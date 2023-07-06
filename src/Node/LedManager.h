@@ -23,72 +23,88 @@ public:
     g = _g;
     b = _b;
   }
-
 };
 
-class LedManager {
+namespace LED_MANAGER {
 
-  // for dynamic animation (loading)
+// for dynamic animation (loading)
 
-  ColorRGB foregroundColor = ColorRGB(0, 0, 0);
-  ColorRGB backgroundColor = ColorRGB(0, 0, 0);
-  int nowIndex = 0;
-  int length = 3;
-  int step = 1;
+ColorRGB foregroundColor = ColorRGB(0, 0, 0);
+ColorRGB backgroundColor = ColorRGB(0, 0, 0);
+int nowIndex = 0;
+int length = 3;
+int step = 1;
 
-public:
+uint8_t ihue = 0;
+uint8_t thissat = 255;
 
-  LedManager() {
+void (*ledFunction)() = nullptr;
 
-    pinMode(LED_PIN, OUTPUT);
+void setUp() {
 
-    FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, LED_NUM);
+  pinMode(LED_PIN, OUTPUT);
 
-    FastLED.setBrightness(255);
+  FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, LED_NUM);
 
-    FastLED.clearData();  // false
+  FastLED.setBrightness(255);
 
-    FastLED.show();
+  FastLED.clearData();  // false
+
+  FastLED.show();
+}
+
+void setBrightness(uint8_t scale) {
+  FastLED.setBrightness(scale);
+}
+
+CFastLED getFastLED() {
+  return FastLED;
+}
+
+void initLoadAnimation(ColorRGB _foregroundcolor, ColorRGB _backgroundColor, int _startIndex, int _length, int _step = 1) {
+  foregroundColor = _foregroundcolor;
+  backgroundColor = _backgroundColor;
+
+  nowIndex = _startIndex;
+  length = _length;
+  step = _step;
+
+  return;
+}
+
+void tickAnimation() {
+  int tempIndex(0);
+
+  for (int i = 0; i < length; i++) {
+    tempIndex = nowIndex - i;
+    leds[tempIndex < 0 ? LED_NUM - (-tempIndex) : tempIndex].setRGB(backgroundColor.r, backgroundColor.g, backgroundColor.b);
+    leds[(nowIndex + i) % LED_NUM].setRGB(foregroundColor.r, foregroundColor.g, foregroundColor.b);
   }
 
-  void setBrightness(uint8_t scale) {
-    FastLED.setBrightness(scale);
+  nowIndex = (nowIndex + step) % LED_NUM;
+
+  FastLED.show();
+
+  return;
+}
+
+void showColor(ColorRGB _color) {
+  FastLED.showColor(CRGB(_color.r, _color.g, _color.b));
+
+  return;
+}
+
+void tickStaticColor() {
+}
+
+void rainbow_fade() {
+
+  ++ihue;
+
+  for (int index = 0; index < LED_NUM; ++index) {
+    leds[index] = CHSV(ihue, thissat, 255);
   }
 
-  CFastLED getFastLED() {
-    return FastLED;
-  }
-
-  void initLoadAnimation(ColorRGB _foregroundcolor, ColorRGB _backgroundColor, int _startIndex, int _length, int _step = 1) {
-    this->foregroundColor = _foregroundcolor;
-    this->backgroundColor = _backgroundColor;
-
-    this->nowIndex = _startIndex;
-    this->length = _length;
-    this->step = _step;
-
-    return;
-  }
-
-  void tickLoadAnimation() {
-    int tempIndex(0);
-
-    for (int i = 0; i < this->length; i++) {
-      tempIndex = this->nowIndex - i;
-      leds[tempIndex < 0 ? LED_NUM - (-tempIndex) : tempIndex].setRGB(this->backgroundColor.r, this->backgroundColor.g, this->backgroundColor.b);
-      leds[(this->nowIndex + i) % LED_NUM].setRGB(this->foregroundColor.r, this->foregroundColor.g, this->foregroundColor.b);
-    }
-
-    this->nowIndex = (this->nowIndex + this->step) % LED_NUM;
-
-    FastLED.show();
-
-    return;
-  }
-
-  void showColor(ColorRGB _color) {
-    FastLED.showColor(CRGB(_color.r, _color.g, _color.b));
-
-    return;
-  }
-};
+  LEDS.show();
+}
+}
