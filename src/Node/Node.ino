@@ -12,8 +12,6 @@
 const uint32_t MULTIPLIER_TIMEOUT_PING = 5000;
 uint32_t TIMEOUT_PING = MULTIPLIER_TIMEOUT_PING * 1;
 
-#define FREQUENCY_UPDATE_LED_FOR_LOADING 70
-
 #define RX_PIN 4     // D2
 #define TX_PIN 0     // D3
 #define FAKE_PIN 16  // D0
@@ -124,6 +122,11 @@ void loop() {
 
       case static_cast<char>(MSG_TYPES::BRIGHTNESS):
         LED_MANAGER::setBrightness(bus.getData()[1]);
+        reInitAnimation();
+        break;
+
+      case static_cast<char>(MSG_TYPES::DELAY):
+        timeDelayAnimation = bus.getData()[1];
         reInitAnimation();
         break;
 
@@ -258,19 +261,15 @@ void reInitAnimation() {
 
   ticker.detach();
 
-  Serial.println("reinit");
-
   if (mode == ARGB_MODES::STATIC_COLOR) {
 
-
-    Serial.println("staticColor");
     LED_MANAGER::showColor(color);
 
   } else if (mode == ARGB_MODES::STATIC_COLOR_ANIM) {
 
     LED_MANAGER::ledFunction = LED_MANAGER::tickStaticColor;
 
-    if (timeDelayAnimation < 100) { timeDelayAnimation = 120; }  // remove it if user setting delay in web-interface
+    // if (timeDelayAnimation < 100) { timeDelayAnimation = 270; }  // remove it if user setting delay in web-interface
     ticker.attach_ms(timeDelayAnimation, interruptFunction);
 
   } else if (mode == ARGB_MODES::ANIMATION) {
@@ -282,7 +281,13 @@ void reInitAnimation() {
 
     LED_MANAGER::ledFunction = LED_MANAGER::rainbow_fade;
     // timeDelayAnimation = 20;
-    ticker.attach_ms(20, interruptFunction);
+    ticker.attach_ms(timeDelayAnimation, interruptFunction);
+
+  } else if (mode == ARGB_MODES::COLOR_BOUNCE_FADE) {
+
+    LED_MANAGER::ledFunction = LED_MANAGER::color_bounceFADE;
+    // timeDelayAnimation = 20;
+    ticker.attach_ms(timeDelayAnimation, interruptFunction);
   }
 }
 

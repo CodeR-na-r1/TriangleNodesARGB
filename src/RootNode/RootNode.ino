@@ -27,11 +27,12 @@ auto timerPingPong = millis();
 
 /* address strip parameters */
 
-uint8_t brightness = 255;
-uint8_t mode = static_cast<uint8_t>(ARGB_MODES::STATIC_COLOR);
-uint8_t rColor = 59;
-uint8_t gColor = 26;
-uint8_t bColor = 93;
+char brightness = 255;
+char ledDelay = 240;
+char mode = static_cast<char>(ARGB_MODES::ANIMATION);
+char rColor = 23;
+char gColor = 8;
+char bColor = 59;
 
 char* queueBuffer = new char[20];
 uint8_t queueSize = 0;
@@ -55,6 +56,7 @@ void setup() {
 
     SERVER_NAMESPACE::setuserCahngeColorCallback(serverChangeColorCallback);
     SERVER_NAMESPACE::setuserCahngeBrightnessCallback(serverChangeBrightnessCallback);
+    SERVER_NAMESPACE::setuserCahngeDelayCallback(serverChangeDelayCallback);
     SERVER_NAMESPACE::setuserCahngeModeCallback(serverChangeModeCallback);
     Serial.println("setUserCallback is set");
   } else {
@@ -122,6 +124,10 @@ void loop() {
               buffer[0] = static_cast<char>(MSG_TYPES::SET_TIMEOUT_PING);
               buffer[1] = nodes.size() & 0xFF;
               bus.sendBroadcast(buffer, 2);
+
+              // send state new node
+
+              sendState(nodes[nodes.size() - 1]);
             }
           }
         }
@@ -221,6 +227,12 @@ void serverChangeColorCallback(String _r, String _g, String _b) {
 
   queueSize = 4;
 
+  // save state
+
+  rColor = atoi(_r.c_str());
+  gColor = atoi(_g.c_str());
+  bColor = atoi(_b.c_str());
+
   Serial.print("r = ");
   Serial.println(_r);
 
@@ -240,8 +252,25 @@ void serverChangeBrightnessCallback(String _brightness) {
 
   queueSize = 2;
 
+  brightness = atoi(_brightness.c_str());
+
   Serial.print("brightness = ");
   Serial.println(_brightness);
+}
+
+void serverChangeDelayCallback(String _delay) {
+
+  queueBuffer[0] = static_cast<char>(MSG_TYPES::DELAY);
+  queueBuffer[1] = atoi(_delay.c_str());
+
+  isQueueData = true;
+
+  queueSize = 2;
+
+  ledDelay = atoi(_delay.c_str());
+
+  Serial.print("delay = ");
+  Serial.println(_delay);
 }
 
 void serverChangeModeCallback(String _mode) {
@@ -251,18 +280,27 @@ void serverChangeModeCallback(String _mode) {
   if (_mode == "Static") {
 
     queueBuffer[1] = static_cast<char>(ARGB_MODES::STATIC_COLOR);
+    mode = static_cast<char>(ARGB_MODES::STATIC_COLOR);
 
   } else if (_mode == "StaticAnim") {
 
     queueBuffer[1] = static_cast<char>(ARGB_MODES::STATIC_COLOR_ANIM);
+    mode = static_cast<char>(ARGB_MODES::STATIC_COLOR_ANIM);
 
   } else if (_mode == "Animation") {
 
     queueBuffer[1] = static_cast<char>(ARGB_MODES::ANIMATION);
+    mode = static_cast<char>(ARGB_MODES::ANIMATION);
 
   } else if (_mode == "Rainbow") {
 
     queueBuffer[1] = static_cast<char>(ARGB_MODES::RAINBOW_ANIM);
+    mode = static_cast<char>(ARGB_MODES::RAINBOW_ANIM);
+
+  } else if (_mode == "ColorBounce") {
+
+    queueBuffer[1] = static_cast<char>(ARGB_MODES::COLOR_BOUNCE_FADE);
+    mode = static_cast<char>(ARGB_MODES::COLOR_BOUNCE_FADE);
   }
 
   isQueueData = true;
@@ -271,4 +309,33 @@ void serverChangeModeCallback(String _mode) {
 
   Serial.print("mode = ");
   Serial.println(_mode);
+}
+
+void sendState(uint8_t addr) {
+
+  //send color
+
+  buffer[0] = static_cast<char>(MSG_TYPES::LED_COLOR_INFO);
+  buffer[1] = rColor;
+  buffer[2] = gColor;
+  buffer[3] = bColor;
+  bus.send(addr, buffer, 4);
+
+  //send brightness
+
+  buffer[0] = static_cast<char>(MSG_TYPES::BRIGHTNESS);
+  buffer[1] = brightness;
+  bus.send(addr, buffer, 2);
+
+  //send delay
+
+  buffer[0] = static_cast<char>(MSG_TYPES::DELAY);
+  buffer[1] = ledDelay;
+  bus.send(addr, buffer, 2);
+
+  //send mode
+
+  buffer[0] = static_cast<char>(MSG_TYPES::LED_MODE_INFO);
+  buffer[1] = mode;
+  bus.send(addr, buffer, 2);
 }

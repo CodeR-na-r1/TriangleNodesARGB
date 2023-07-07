@@ -1,5 +1,12 @@
 #include <FastLED.h>  // https://kit.alexgyver.ru/tutorials/address-strip/
 
+// for future
+// 
+// https://github.com/AlexGyver/WS2812_FX/blob/master/%D0%BF%D1%80%D0%BE%D1%88%D0%B8%D0%B2%D0%BA%D0%B8/WS2812_FX_rndChange_light_fixed/LED_EFFECT_FUNCTIONS.ino
+//
+//  https://github.com/GyverLibs/VolAnalyzer
+// 
+
 #include "CRGB_COLORS.h"
 
 extern CRGB CRGBColors[];
@@ -31,9 +38,29 @@ public:
 
 namespace LED_MANAGER {
 
+// service functions
+
+int adjacent_cw(int i) {
+  int r;
+  if (i < LED_NUM - 1) {
+    r = i + 1;
+  } else {
+    r = 0;
+  }
+  return r;
+}
+
+int adjacent_ccw(int i) {
+  int r;
+  if (i > 0) {
+    r = i - 1;
+  } else {
+    r = LED_NUM - 1;
+  }
+  return r;
+}
+
 // for dynamic animation (loading)
-
-
 
 ColorRGB foregroundColor = ColorRGB(0, 0, 0);
 ColorRGB backgroundColor = ColorRGB(0, 0, 0);
@@ -115,4 +142,64 @@ void rainbow_fade() {
 
   LEDS.show();
 }
+
+int8_t bouncedirection = 0;
+uint8_t idex = 0;
+uint8_t thishue = 24;
+bool forward = true;
+
+void color_bounceFADE() {
+
+  if (bouncedirection == 0) {
+    idex = idex + 1;
+    if (idex == LED_NUM) {
+      bouncedirection = 1;
+      idex = idex - 1;
+    }
+  }
+  if (bouncedirection == 1) {
+    idex = idex - 1;
+    if (idex == 0) {
+      bouncedirection = 0;
+    }
+  }
+
+  if (forward) {
+    ++thishue;
+    if (thishue == 255) { forward = false; }
+  } else {
+    --thishue;
+    if (thishue == 0) { forward = true; }
+  }
+
+  int iL1 = adjacent_cw(idex);
+  int iL2 = adjacent_cw(iL1);
+  int iL3 = adjacent_cw(iL2);
+  int iR1 = adjacent_ccw(idex);
+  int iR2 = adjacent_ccw(iR1);
+  int iR3 = adjacent_ccw(iR2);
+
+  for (int i = 0; i < LED_NUM; i++) {
+    if (i == idex) {
+      leds[i] = CHSV(thishue, thissat, 255);
+    } else if (i == iL1) {
+      leds[i] = CHSV(thishue, thissat, 150);
+    } else if (i == iL2) {
+      leds[i] = CHSV(thishue, thissat, 80);
+    } else if (i == iL3) {
+      leds[i] = CHSV(thishue, thissat, 20);
+    } else if (i == iR1) {
+      leds[i] = CHSV(thishue, thissat, 150);
+    } else if (i == iR2) {
+      leds[i] = CHSV(thishue, thissat, 80);
+    } else if (i == iR3) {
+      leds[i] = CHSV(thishue, thissat, 20);
+    } else {
+      leds[i] = CHSV(0, 0, 0);
+    }
+  }
+
+  LEDS.show();
+}
+
 }

@@ -33,6 +33,7 @@ AsyncWebServer server(80);
 
 void (*userCahngeColorCallback)(String, String, String) = nullptr;
 void (*userCahngeBrightnessCallback)(String) = nullptr;
+void (*userCahngeDelayCallback)(String) = nullptr;
 void (*userCahngeModeCallback)(String) = nullptr;
 
 // uint8_t* mode = nullptr;
@@ -53,6 +54,12 @@ void setuserCahngeColorCallback(void (*_userCallback)(String, String, String)) {
 
 void setuserCahngeBrightnessCallback(void (*_userCallback)(String)) {
   userCahngeBrightnessCallback = _userCallback;
+
+  return;
+}
+
+void setuserCahngeDelayCallback(void (*_userCallback)(String)) {
+  userCahngeDelayCallback = _userCallback;
 
   return;
 }
@@ -95,12 +102,18 @@ void initHTML() {
   html += "</p>\n";
 
   html += "<p>\n";
+  html += "<label for=\"delayChoise\">delayChoise:</label>\n";
+  html += "<input type=\"range\" id=\"delay\" name=\"delayChoise\" min=\"20\" max=\"500\" required>\n";
+  html += "</p>\n";
+
+  html += "<p>\n";
   html += "<label for=\"modeChoise\">modeChoise:</label>\n";
   html += "<select id=\"mode\" name=\"modeChoise\">\n";
   html += "<option value=\"Static\">Static color</option>";
   html += "<option value=\"StaticAnim\">Static color animation</option>";
   html += "<option value=\"Animation\">Load animation</option>";
   html += "<option value=\"Rainbow\">Rainbow animation</option>";
+  html += "<option value=\"ColorBounce\">Color bounce fade</option>";
   html += "</select>\n";
   html += "</p>\n";
   // html += "<button type=\"submit\">Change color</button>";
@@ -153,13 +166,31 @@ void initHTML() {
 
   html += "</script>";
 
+  // Для обработки delay
+
+  html += "<script>";
+
+  html += "let elemDelay = document.getElementById(\"delay\");";
+  html += "elemDelay.addEventListener(\"change\", updateDelay);";
+  html += "console.log(\"script3 work!\");";
+
+  html += "function updateDelay(event) {";
+  html += "let valueDelay = event.target.value;";
+  html += "console.log(valueDelay);";
+
+  html += "fetch(window.location.origin + \"/commitDelay?delay=\" + valueDelay);";
+  html += "console.log(window.location.origin + \"/commitDelay?delay=\" + valueDelay);";
+  html += "}";
+
+  html += "</script>";
+
   // Для обработки режима
 
   html += "<script>";
 
   html += "let elemMode = document.getElementById(\"mode\");";
   html += "elemMode.addEventListener(\"change\", updateMode);";
-  html += "console.log(\"script3 work!\");";
+  html += "console.log(\"script4 work!\");";
 
   html += "function updateMode(event) {";
   html += "let valueMode = event.target.value;";
@@ -246,6 +277,30 @@ void processsingBrightnessGetReq(AsyncWebServerRequest* request) {
   request->send(200, "text/html", html);
 }
 
+void processsingDelayGetReq(AsyncWebServerRequest* request) {
+
+  Serial.println("get Delay req!");
+  String delay;
+
+  if (request->hasParam("delay")) {
+    delay = request->getParam("delay")->value();
+    Serial.println("delay get!");
+  } else {
+    Serial.println("delay FAIL!");
+    request->send(200, "text/plain", "Error delay field!");
+    return;
+  }
+
+  if (userCahngeDelayCallback != nullptr) {
+    userCahngeDelayCallback(delay);
+    Serial.println("_userCallback called");
+  } else {
+    Serial.println("_userCallback is nullpointer");
+  }
+
+  request->send(200, "text/html", html);
+}
+
 void processsingModeGetReq(AsyncWebServerRequest* request) {
 
   Serial.println("get mode req!");
@@ -280,6 +335,7 @@ int start() {
   server.on("/", HTTP_GET, mainPage);
   server.on("/commitColor", HTTP_GET, processsingColorGetReq);
   server.on("/commitBrightness", HTTP_GET, processsingBrightnessGetReq);
+  server.on("/commitDelay", HTTP_GET, processsingDelayGetReq);
   server.on("/commitMode", HTTP_GET, processsingModeGetReq);
 
   server.begin();
